@@ -153,7 +153,7 @@
         var p2 = player.play();
         if (p2 && p2.catch) {
           p2.then(function () {
-            hideStatus(); showOverlay(); hideOverlay();
+            hideStatus(); hideOverlay();
             unmute.classList.add('show');
           }).catch(function () {
             hideStatus(); showOverlay();

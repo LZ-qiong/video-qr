@@ -29,6 +29,19 @@
 └── 海报页.html          可打印海报
 ```
 
+## 视频处理记录（已完成）
+
+原始视频为**手机拍摄的超大 HEVC 文件**，无法在微信/安卓浏览器直接播放，已转码：
+
+| | 原始文件 | 转码后 | 说明 |
+|---|---|---|---|
+| 视频一 | 476.8 MB · 3460×2160 · **120fps** · HEVC 8bit · moov 在尾部 | **12.8 MB** | 1080p/30fps · H.264 High · faststart |
+| 视频二 | 410.1 MB · 3844×2160 · 30fps · **HEVC 10bit** · moov 在尾部 | **44.3 MB** | 1080p/30fps · H.264 High · faststart |
+
+- 转码参数：`libx264 -preset medium -crf 25 -profile:v high -level 4.1 -pix_fmt yuv420p`，音频直接复制，剥离元数据（防设备/GPS 泄露），`-movflags +faststart` 让手机可边下边播。
+- 画质质检：抽帧对比原片，平均像素差异 1~3.6/255（约 1%），肉眼无感。
+- 原始文件保持原样，未做任何修改。
+
 ## 播放页行为
 
 1. 进入页面立即尝试**带声音自动播放**；
@@ -36,8 +49,14 @@
 3. 若完全被拦截，显示**大播放按钮**，点击即播放；
 4. 视频加载中显示缓冲提示；文件未上传时显示"视频即将上线"。
 
-## 待完成（视频到位后）
+## 后续维护
 
-1. 视频上传到 GitHub Release 资产（单文件上限 2GB，规避 GitHub 仓库 100MB 限制）；
-2. 把 `v1/index.html`、`v2/index.html` 里的 `CONFIG.videoUrl` 填成对应视频地址；
-3. 提交推送，约 1 分钟生效。
+- **改标题**：编辑 `v1/index.html`、`v2/index.html` 里 `CONFIG.title` / `CONFIG.subtitle`（二维码无需更换）。
+- **换视频**：替换 `v1/video.mp4`、`v2/video.mp4` 后提交推送即可（二维码无需更换）。
+- 推送命令（令牌需自行替换）：
+  ```
+  git add -A
+  git commit -m "更新"
+  git push https://<用户名>:<令牌>@github.com/LZ-qiong/video-qr.git main
+  ```
+
