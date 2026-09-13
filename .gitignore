@@ -1,0 +1,5 @@
+# 中间产物不入库（视频已放在 v1/ v2/ 目录下）
+videos/
+_qc/
+_probe_mp4.py
+_probe_mp4b.py
