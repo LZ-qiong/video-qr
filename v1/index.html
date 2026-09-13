@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0f14">
+<title>视频一</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: #0b0f14; color: #e8f1f4;
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+    overflow: hidden; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+
+  /* 顶部标题 */
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+    background: linear-gradient(180deg, rgba(6,10,14,.78), rgba(6,10,14,0));
+    pointer-events: none; transition: opacity .3s;
+  }
+  #topbar h1 { font-size: 15px; font-weight: 700; letter-spacing: .5px; }
+  #topbar p { font-size: 11.5px; color: #8fb0bd; margin-top: 3px; }
+  #topbar.hide { opacity: 0; }
+
+  /* 中央播放按钮 */
+  #playOverlay {
+    position: absolute; inset: 0; z-index: 15;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.45); cursor: pointer;
+  }
+  #playOverlay.show { display: flex; }
+  #playBtn {
+    width: 88px; height: 88px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,.94); color: #0b0f14;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 34px rgba(0,0,0,.55);
+    animation: pulse 1.8s infinite;
+  }
+  #playBtn svg { width: 38px; height: 38px; margin-left: 5px; }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+  }
+
+  /* 状态提示（等待上传 / 加载中 / 出错） */
+  #status {
+    position: absolute; inset: 0; z-index: 18;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 30px 24px; gap: 14px;
+  }
+  #status.hide { display: none; }
+  #status .icon { font-size: 44px; opacity: .85; }
+  #status h2 { font-size: 16px; font-weight: 700; }
+  #status p { font-size: 12.5px; color: #8fb0bd; line-height: 1.8; max-width: 300px; }
+  .spinner {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,.18); border-top-color: #12a4b0;
+    animation: spin .9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn {
+    margin-top: 6px; padding: 9px 20px; border-radius: 999px; border: 1.5px solid #12a4b0;
+    background: transparent; color: #4fd8e2; font-size: 13px; font-weight: 600;
+  }
+
+  /* 静音提示 / 底部信息 */
+  #unmute {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 25;
+    display: none; align-items: center; gap: 8px;
+    padding: 10px 18px; border-radius: 999px; border: none;
+    background: rgba(18,164,176,.94); color: #fff; font-size: 13px; font-weight: 700;
+    box-shadow: 0 8px 24px rgba(0,0,0,.45);
+    animation: bounce 1.6s infinite;
+  }
+  #unmute.show { display: flex; }
+  @keyframes bounce {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-5px); }
+  }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>视频一</h1>
+  <p>扫码即看 · 点击画面显示/隐藏标题</p>
+</div>
+
+<div id="stage">
+  <video id="player" playsinline webkit-playsinline x5-playsinline
+         x5-video-player-type="h5" x5-video-player-fullscreen="true"
+         preload="auto" controls controlslist="nodownload"></video>
+
+  <div id="playOverlay">
+    <button id="playBtn" aria-label="播放">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+  </div>
+
+  <div id="status">
+    <div class="icon" id="statusIcon">🎬</div>
+    <h2 id="statusTitle">正在加载视频…</h2>
+    <p id="statusText"></p>
+    <button class="btn" id="retryBtn" style="display:none">重新加载</button>
+  </div>
+</div>
+
+<button id="unmute">🔇 点击开启声音</button>
+
+<script>
+  /* ============ 配置区（改这里即可，二维码无需更换） ============ */
+  var CONFIG = {
+    title: '视频一',
+    subtitle: '扫码即看 · 点击画面显示/隐藏标题',
+    videoUrl: ''   /* 视频地址；留空则显示"待上传"提示 */
+  };
+  /* ============================================================ */
+
+  var player   = document.getElementById('player');
+  var status   = document.getElementById('status');
+  var sIcon    = document.getElementById('statusIcon');
+  var sTitle   = document.getElementById('statusTitle');
+  var sText    = document.getElementById('statusText');
+  var retryBtn = document.getElementById('retryBtn');
+  var overlay  = document.getElementById('playOverlay');
+  var unmute   = document.getElementById('unmute');
+  var topbar   = document.getElementById('topbar');
+
+  function showStatus(icon, title, text, canRetry) {
+    sIcon.textContent = icon;
+    sTitle.textContent = title;
+    sText.textContent = text || '';
+    retryBtn.style.display = canRetry ? 'inline-block' : 'none';
+    status.classList.remove('hide');
+  }
+  function hideStatus() { status.classList.add('hide'); }
+  function showOverlay() { overlay.classList.add('show'); }
+  function hideOverlay() { overlay.classList.remove('show'); }
+
+  /* 自动播放：先试带声音 → 失败则静音播放 → 再失败显示大播放按钮 */
+  function tryAutoplay() {
+    var p = player.play();
+    if (p && p.catch) {
+      p.then(function () {
+        hideOverlay(); hideStatus();
+      }).catch(function () {
+        player.muted = true;
+        var p2 = player.play();
+        if (p2 && p2.catch) {
+          p2.then(function () {
+            hideStatus(); showOverlay(); hideOverlay();
+            unmute.classList.add('show');
+          }).catch(function () {
+            hideStatus(); showOverlay();
+          });
+        }
+      });
+    }
+  }
+
+  function boot() {
+    if (!CONFIG.videoUrl) {
+      showStatus('🎬', '视频即将上线', '视频文件尚未上传，上传后本页面会自动开始播放。扫码地址长期有效，无需更换二维码。', false);
+      return;
+    }
+    player.src = CONFIG.videoUrl;
+    player.load();
+    showStatus('⏳', '正在加载视频…', '');
+    tryAutoplay();
+  }
+
+  /* 事件绑定 */
+  player.addEventListener('loadeddata', function () { hideStatus(); });
+  player.addEventListener('playing', function () {
+    hideStatus(); hideOverlay();
+    if (!player.muted) { unmute.classList.remove('show'); }
+  });
+  player.addEventListener('waiting', function () {
+    if (!player.paused) { showStatus('⏳', '缓冲中…', ''); }
+  });
+  player.addEventListener('error', function () {
+    showStatus('⚠️', '视频加载失败', '请检查网络后重试；若持续失败，可能是视频文件尚未上传。', true);
+  });
+  player.addEventListener('ended', function () { topbar.classList.remove('hide'); });
+
+  overlay.addEventListener('click', function () {
+    unmute.classList.remove('show');
+    player.muted = false;
+    player.play();
+  });
+  unmute.addEventListener('click', function () {
+    player.muted = false;
+    player.play();
+    unmute.classList.remove('show');
+  });
+  retryBtn.addEventListener('click', function () { boot(); });
+  player.addEventListener('click', function () {
+    topbar.classList.toggle('hide');
+  });
+
+  boot();
+</script>
+</body>
+</html>
