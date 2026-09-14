@@ -3,3 +3,7 @@ videos/
 _qc/
 _probe_mp4.py
 _probe_mp4b.py
+
+# 原始素材文件夹（体积很大，不进版本库）
+choose me first/
+best/
